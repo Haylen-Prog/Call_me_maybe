@@ -1,21 +1,25 @@
 VENV = .venv
 VENV_PATH = ${VENV}/bin/activate
+OUTPUT = output
 PYTHON = python3
-MYPYSTRICT = mypy --exclude=${VENV} --strict .
-FLAKE8 = flake8 --exclude=${VENV} .
-MYPYFLAGS = mypy --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --exclude=${VENV} .
+LLM = llm_sdk
 
-.PHONY: install run all debug clean fclean lint lint-strict push
+MYPYSTRICT = mypy --exclude=${LLM} --exclude=${VENV} --strict .
+FLAKE8 = flake8 --exclude=${LLM},${VENV} .
+MYPYFLAGS = mypy --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --exclude=${LLM} --exclude=${VENV} .
+
+.PHONY: install run all debug test demo clean fclean lint lint-strict re push
 
 install:
-	@cd /goinfre/$${USER}/containers; \
-	uv venv
+	@cd /goinfre/$${USER}/containers && uv venv
 	@rm -rf .venv; \
 	ln -s /goinfre/$${USER}/containers/.venv .venv; \
 	uv sync; \
-	uv add --editable ./llm_sdk
+	uv add --editable ./llm_sdk; \
+	uv add accelerate mypy flake8 numpy pydantic
 
 run:
+	@test -L .venv || (echo "[ERROR] Run make install first"; exit 1)
 	@echo "Python executable:"; \
 	uv run python -c "import sys; print(sys.executable)"; \
 	echo ""; \
@@ -25,23 +29,34 @@ run:
 	echo "Base prefix:"; \
 	uv run python -c "import sys; print(sys.base_prefix)"; \
 	echo "" ; \
-	sleep 1; \
 	echo "Inside virtualenv:"; \
 	uv run python -c "import sys; print(sys.prefix != sys.base_prefix)"; \
 	echo "" ; \
-	sleep 2; \
-	uv run python -m call_me_maybe
+	uv run python -m src
 
 all: install run
 
 debug:
-	@pdb ${NAME}
+	@test -L .venv || (echo "[ERROR] Run make install first"; exit 1)
+	@echo "Python executable:"; \
+	uv run python -c "import sys; print(sys.executable)"; \
+	echo ""; \
+	echo "Prefix:"; \
+	uv run python -c "import sys; print(sys.prefix)"; \
+	echo ""; \
+	echo "Base prefix:"; \
+	uv run python -c "import sys; print(sys.base_prefix)"; \
+	echo "" ; \
+	echo "Inside virtualenv:"; \
+	uv run python -c "import sys; print(sys.prefix != sys.base_prefix)"; \
+	echo "" ; \
+	uv run python -m src --debug
 
 clean:
 	@find . -type d -name "__pycache__" -exec rm -rf {} +; rm -rf .mypy_cache
 
 fclean: clean
-	@rm -rf ${VENV}; \
+	@rm -rf ${VENV} ${OUTPUT}; \
 	cd /goinfre/$${USER}/containers; \
 	rm -rf ${VENV}
 
